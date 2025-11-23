@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini TTS Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .container {
+            min-height: 100vh;
+        }
+        .card {
+            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .button-primary {
+            transition: all 0.15s ease-in-out;
+        }
+        .button-primary:hover {
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container flex items-center justify-center p-4">
+    <div class="card bg-white p-6 md:p-10 rounded-xl w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">
+            Text-to-Speech Generator
+        </h1>
+        <p class="text-gray-500 mb-8 text-center">
+            Enter text and select a voice to generate audio using the Gemini TTS model.
+        </p>
+
+        <div class="space-y-6">
+            <!-- Text Input Area -->
+            <div>
+                <label for="text-input" class="block text-sm font-medium text-gray-700 mb-2">Text to Speak</label>
+                <textarea id="text-input" rows="4" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="Type the text you want to convert to speech here..."></textarea>
+            </div>
+
+            <!-- Voice Selection -->
+            <div>
+                <label for="voice-select" class="block text-sm font-medium text-gray-700 mb-2">Select Voice</label>
+                <select id="voice-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm appearance-none bg-white">
+                    <option value="Kore">Kore (Firm)</option>
+                    <option value="Zephyr">Zephyr (Bright)</option>
+                    <option value="Puck">Puck (Upbeat)</option>
+                    <option value="Charon">Charon (Informative)</option>
+                    <option value="Fenrir">Fenrir (Excitable)</option>
+                    <option value="Leda">Leda (Youthful)</option>
+                </select>
+            </div>
+
+            <!-- Action Button -->
+            <button id="generate-button" class="button-primary w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50" onclick="generateTTS()">
+                Generate Speech
+            </button>
+
+            <!-- Status and Audio Output -->
+            <div id="status-message" class="text-center p-3 rounded-lg hidden"></div>
+
+            <div id="audio-output" class="hidden pt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Generated Audio</label>
+                <audio id="audio-player" controls class="w-full rounded-lg"></audio>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const MODEL_NAME = "gemini-2.5-flash-preview-tts";
+    const generateButton = document.getElementById('generate-button');
+    const textInput = document.getElementById('text-input');
+    const voiceSelect = document.getElementById('voice-select');
+    const statusMessage = document.getElementById('status-message');
+    const audioOutput = document.getElementById('audio-output');
+    const audioPlayer = document.getElementById('audio-player');
+
+    // Utility function to convert Base64 string to ArrayBuffer
+    function base64ToArrayBuffer(base64) {
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    // Utility function to convert PCM audio data (ArrayBuffer) to a WAV Blob
+    function pcmToWav(pcmData, sampleRate) {
+        const pcm16 = new Int16Array(pcmData);
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+        const blockAlign = numChannels * (bitsPerSample / 8);
+        const dataSize = pcm16.length * 2; // 2 bytes per 16-bit sample
+
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+
+        let offset = 0;
+
+        /* RIFF identifier */
+        view.setUint32(offset, 0x52494646, false); offset += 4;
+        /* file length */
+        view.setUint32(offset, 36 + dataSize, true); offset += 4;
+        /* RIFF type */
+        view.setUint32(offset, 0x57415645, false); offset += 4;
+        /* format chunk identifier */
+        view.setUint32(offset, 0x666d7420, false); offset += 4;
+        /* format chunk length */
+        view.setUint32(offset, 16, true); offset += 4;
+        /* sample format (1 for PCM) */
+        view.setUint16(offset, 1, true); offset += 2;
+        /* number of channels */
+        view.setUint16(offset, numChannels, true); offset += 2;
+        /* sample rate */
+        view.setUint32(offset, sampleRate, true); offset += 4;
+        /* byte rate */
+        view.setUint32(offset, byteRate, true); offset += 4;
+        /* block align */
+        view.setUint16(offset, blockAlign, true); offset += 2;
+        /* bits per sample */
+        view.setUint16(offset, bitsPerSample, true); offset += 2;
+        /* data chunk identifier */
+        view.setUint32(offset, 0x64617461, false); offset += 4;
+        /* data chunk length */
+        view.setUint32(offset, dataSize, true); offset += 4;
+
+        // Write PCM data
+        const pcmBuffer = new Uint8Array(buffer, offset);
+        pcmBuffer.set(new Uint8Array(pcmData));
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function setStatus(message, isError = false) {
+        statusMessage.textContent = message;
+        statusMessage.className = `text-center p-3 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} block`;
+    }
+
+    function setLoading(isLoading) {
+        generateButton.disabled = isLoading;
+        generateButton.textContent = isLoading ? 'Generating... (may take a moment)' : 'Generate Speech';
+        if (!isLoading) {
+            statusMessage.classList.add('hidden');
+        }
+    }
+
+    /**
+     * @param {number} delay_ms The delay in milliseconds before retrying.
+     * @param {number} maxRetries The maximum number of retry attempts.
+     * @param {Function} fn The async function to execute.
+     * @param {*} args Arguments to pass to the function.
+     * @returns The result of the function if successful.
+     */
+    async function retryWithExponentialBackoff(delay_ms, maxRetries, fn, ...args) {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                return await fn(...args);
+            } catch (error) {
+                if (i === maxRetries - 1) {
+                    throw error;
+                }
+                const waitTime = delay_ms * Math.pow(2, i);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                // Do not log retry attempts as errors in the console.
+            }
+        }
+    }
+
+    async function generateTTS() {
+        const prompt = textInput.value.trim();
+        const voice = voiceSelect.value;
+        if (!prompt) {
+            setStatus("Please enter text to generate speech.", true);
+            return;
+        }
+
+        setLoading(true);
+        audioOutput.classList.add('hidden');
+        audioPlayer.removeAttribute('src');
+
+        const apiKey = ""; // Leave as empty string for the environment to handle
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+        const payload = {
+            contents: [{
+                parts: [{ text: prompt }]
+            }],
+            generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: voice }
+                    }
+                }
+            },
+        };
+
+        const fetchTTS = async () => {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                // Throw an error to trigger exponential backoff retry
+                const errorBody = await response.text();
+                throw new Error(`HTTP Error: ${response.status} - ${errorBody}`);
+            }
+
+            return response.json();
+        };
+
+        try {
+            const result = await retryWithExponentialBackoff(1000, 3, fetchTTS);
+
+            const candidate = result.candidates?.[0];
+            const part = candidate?.content?.parts?.find(p => p.inlineData);
+
+            if (part && part.inlineData && part.inlineData.data) {
+                const audioData = part.inlineData.data;
+                const mimeType = part.inlineData.mimeType;
+
+                if (mimeType.startsWith("audio/L16")) {
+                    // Extract sample rate from mimeType, e.g., audio/L16;rate=24000
+                    const rateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000; // Default to 24000
+
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const wavBlob = pcmToWav(pcmData, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+
+                    audioPlayer.src = audioUrl;
+                    audioOutput.classList.remove('hidden');
+                    setStatus("Speech generated successfully! Click play to listen.");
+                } else {
+                    setStatus("Unexpected audio format received from API.", true);
+                    console.error("Unexpected MIME Type:", mimeType);
+                }
+            } else {
+                setStatus("Speech generation failed: The API response did not contain audio data.", true);
+                console.error("API Response Missing Audio:", result);
+            }
+
+        } catch (error) {
+            // Display the final error to the user after all retries fail
+            setStatus(`TTS Error: ${error.message}. Please check your input and try again.`, true);
+            console.error("TTS Error:", error);
+        } finally {
+            setLoading(false);
+        }
+    }
+</script>
+
+</body>
+</html>
