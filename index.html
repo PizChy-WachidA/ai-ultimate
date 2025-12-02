@@ -194,7 +194,7 @@
             <div id="plot-result" class="ai-result-box hidden p-4 text-sm"></div>
         </div>
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-            <div class="flex items-center gap-2 mb-4 text-violet-600 font-bold"><i class="ph-fill ph-magic-wand text-xl"></i> เกลาสำนวน</div>
+            <div class="flex items-center gap-2 mb-4 text-violet-600 font-bold"><i class="ph-fill ph-magic-wand text-xl"></i> เกลาบทสนทนา</div>
             <textarea id="refine-input" rows="1" class="w-full p-2.5 border border-slate-200 rounded-lg text-sm mb-3" placeholder="ประโยค..."></textarea>
             <button id="refine-btn" class="w-full bg-violet-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-violet-700">เกลาภาษา</button>
             <div id="refine-result" class="ai-result-box hidden p-4 text-sm italic font-serif text-slate-700"></div>
@@ -647,10 +647,10 @@
 
     // Initialize Voice Select
     const voices = [
-        { name: "Pulcherrima", desc: "แนะนำ (เสียงเป็นกลาง)" },
-        { name: "Leda", desc: "อ่อนเยาว์ (หญิง)" },
+        { name: "Pulcherrima", desc: "เสียงกลาง, ปรัชญา, สุขุม (ชาย)" },
+        { name: "Leda", desc: "อ่อนเยาว์ เสียงเล็ก (หญิง)" },
         { name: "Fenrir", desc: "ตื่นเต้น (ชาย)" },
-        { name: "Kore", desc: "หนักแน่น" },
+        { name: "Kore", desc: "หนักแน่น อบอุ่น" },
         { name: "Puck", desc: "ร่าเริง" },
         { name: "Charon", desc: "ทางการ" }
     ];
@@ -664,7 +664,7 @@
     });
     
     document.getElementById('tts-generate-btn').addEventListener('click', generateTTS);
-    document.getElementById('tts-text-input').value = "สวัสดีครับคุณกุ้งเต้น วันนี้ให้น้องแฮปปี้ไปวิ่งเล่นที่ไหนดีครับ?";
+    document.getElementById('tts-text-input').value = "สวัสดีครับพี่ๆ วันนี้ต้องการให้พู่กันไฟ พากย์เสียงเกี่ยวกับอะไรครับ?";
 
     // --- 4. Global Browser Speech (Backup) ---
     const browserSynth = window.speechSynthesis;
